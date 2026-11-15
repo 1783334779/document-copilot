@@ -18,7 +18,7 @@ Full brief: [docs/client-brief.md](docs/client-brief.md)
 | Migrations         | SQLAlchemy models + Alembic                          |
 | Retrieval          | Supabase `pgvector` + Postgres full-text search      |
 | Auth               | Supabase Auth (email only)                           |
-| Hosting            | Railway                                              |
+| Hosting            | Docker Compose or Railway                            |
 | LLM + embeddings   | DeepSeek chat + DashScope embeddings via OpenAI SDK   |
 
 ## Repo layout
@@ -46,6 +46,23 @@ Install these before setting up `backend/` or `frontend/`:
 | [pnpm](https://pnpm.io/installation) | latest | Frontend package manager | `corepack enable && corepack prepare pnpm@latest --activate` |
 
 You also need accounts/keys for external services. Start with [docs/guides/supabase-setup.md](docs/guides/supabase-setup.md) (account + project), then configure separate [DeepSeek](https://platform.deepseek.com/) chat and [Alibaba Cloud Model Studio](https://www.alibabacloud.com/help/en/model-studio/get-api-key) embedding keys.
+
+## Self-hosting with Docker Compose
+
+From the repository root, copy `.env.example` to `.env` and fill in the two public Supabase values. The [root Dockerfile](Dockerfile) builds React and copies the static files into the Python image. Uvicorn serves React at `/` and the FastAPI endpoints under `/api` in the same container.
+
+Configure `backend/.env` as described below for database and model access. React receives only the public Supabase settings at build time. The default host binding is `127.0.0.1:8000` over HTTP. For public HTTPS, either use an existing HTTPS entry point or configure a certificate and key directly in Uvicorn.
+
+```bash
+docker compose config --quiet
+docker compose build
+docker compose run --rm --no-deps app alembic current
+# If the target database is behind, apply migrations before starting the app:
+# docker compose run --rm --no-deps app alembic upgrade head
+docker compose up -d
+```
+
+Open `http://127.0.0.1:8000` and check `/api/health`. Set `APP_PORT` to use a different host port. To rebuild after changing a frontend setting, run `docker compose up -d --build`.
 
 ## Running locally
 
