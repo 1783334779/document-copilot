@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ChatLayout } from '@/components/chat/ChatLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { PublicRoute } from '@/components/PublicRoute'
+import { env } from '@/lib/env'
 import { ChatEmptyPage } from '@/pages/chat/ChatEmptyPage'
 import { ChatThreadPage } from '@/pages/chat/ChatThreadPage'
 import { Login } from '@/pages/Login'
@@ -10,7 +11,7 @@ import { SignUp } from '@/pages/SignUp'
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={env.basePath || '/'}>
       <Routes>
         <Route
           path="/login"

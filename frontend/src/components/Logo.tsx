@@ -1,3 +1,4 @@
+import { env } from '@/lib/env'
 import { cn } from '@/lib/utils'
 
 type LogoProps = {
@@ -12,7 +13,7 @@ export function LogoMark({ className }: LogoProps) {
         className,
       )}
     >
-      <img src="/log.png" alt="" className="size-full object-contain" />
+      <img src={`${env.basePath}/log.png`} alt="" className="size-full object-contain" />
     </span>
   )
 }

@@ -3,6 +3,7 @@ services:
     build:
       context: .
       args:
+        APP_BASE_PATH: ${APP_BASE_PATH:-/}
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?Set VITE_SUPABASE_URL in the root .env file}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?Set VITE_SUPABASE_ANON_KEY in the root .env file}
     env_file: ${BACKEND_ENV_FILE:-./backend/.env}

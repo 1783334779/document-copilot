@@ -9,13 +9,14 @@ RUN pnpm install --frozen-lockfile
 
 COPY frontend/ ./
 
+ARG APP_BASE_PATH=/
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
-ENV VITE_API_BASE_URL=/api \
-    VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
-RUN pnpm build
+RUN base_path="${APP_BASE_PATH%/}" && \
+    VITE_API_BASE_URL="$base_path/api" pnpm build --base="$base_path/"
 
 FROM python:3.12-slim
 

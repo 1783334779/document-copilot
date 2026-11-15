@@ -53,6 +53,8 @@ From the repository root, copy `.env.example` to `.env` and fill in the two publ
 
 Configure `backend/.env` as described below for database and model access. React receives only the public Supabase settings at build time. The default host binding is `127.0.0.1:8000` over HTTP. For public HTTPS, either use an existing HTTPS entry point or configure a certificate and key directly in Uvicorn.
 
+For a public path such as `/document-copilot/`, set `APP_BASE_PATH=/document-copilot/` in the root `.env` before building the image. Configure the reverse proxy to strip that prefix before forwarding requests. For example, the container should receive `/api/health` for a public request to `/document-copilot/api/health`.
+
 ```bash
 docker compose config --quiet
 docker compose build
