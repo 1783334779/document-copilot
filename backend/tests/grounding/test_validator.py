@@ -1,6 +1,10 @@
 import asyncio
 import uuid
 from datetime import date
+from unittest.mock import MagicMock
+
+import pytest
+from pydantic import ValidationError
 
 from app.assistant.deps import TurnRegistry
 from app.assistant.outputs import Citation, GroundedAnswer
@@ -8,9 +12,41 @@ from app.grounding.validator import (
     CitationGroundingCase,
     CitationGroundingDecision,
     GroundingValidator,
+    OpenAIGroundingJudge,
     prune_unreferenced_citations,
 )
 from app.retrieval.types import RetrievedPassage
+
+
+def test_grounding_json_mode_validates_provider_response(monkeypatch) -> None:
+    client = MagicMock()
+    client.chat.completions.create.return_value.choices[0].message.content = (
+        '{"decisions":[{"citation_index":1,"supported":false,"reason":"unsupported"}]}'
+    )
+    monkeypatch.setattr("app.grounding.validator.OpenAI", lambda **kwargs: client)
+    cases = [CitationGroundingCase(
+        citation_index=1, answer="Revenue doubled.", excerpt="Revenue rose.",
+        source_text="Revenue rose 1%.",
+    )]
+
+    decisions = asyncio.run(OpenAIGroundingJudge().judge(cases))
+
+    assert len(decisions) == 1
+    assert not decisions[0].supported
+    assert client.chat.completions.create.call_args.kwargs["response_format"] == {
+        "type": "json_object"
+    }
+
+
+def test_grounding_json_mode_rejects_malformed_decision(monkeypatch) -> None:
+    client = MagicMock()
+    client.chat.completions.create.return_value.choices[0].message.content = (
+        '{"decisions":[{"citation_index":1}]}'
+    )
+    monkeypatch.setattr("app.grounding.validator.OpenAI", lambda **kwargs: client)
+
+    with pytest.raises(ValidationError):
+        asyncio.run(OpenAIGroundingJudge().judge([]))
 
 
 def _passage(text: str = "Services revenue grew 12% year over year.") -> RetrievedPassage:

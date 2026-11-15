@@ -19,10 +19,10 @@ class CitationPayload(BaseModel):
 
     citation_index: int = Field(alias="citationIndex")
     chunk_id: uuid.UUID = Field(alias="chunkId")
-    excerpt: str
-    ticker: str
+    excerpt: str | None = None
+    ticker: str | None = None
     company_name: str | None = Field(default=None, alias="companyName")
-    form: str
+    form: str | None = None
     filing_date: date = Field(alias="filingDate")
     page: str | None = None
     section: str | None = None

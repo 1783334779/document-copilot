@@ -19,7 +19,7 @@ Full brief: [docs/client-brief.md](docs/client-brief.md)
 | Retrieval          | Supabase `pgvector` + Postgres full-text search      |
 | Auth               | Supabase Auth (email only)                           |
 | Hosting            | Railway                                              |
-| LLM + embeddings   | OpenAI                                               |
+| LLM + embeddings   | DeepSeek chat + DashScope embeddings via OpenAI SDK   |
 
 ## Repo layout
 
@@ -45,7 +45,7 @@ Install these before setting up `backend/` or `frontend/`:
 | [Node.js](https://nodejs.org/) | 20+ (LTS) | Frontend toolchain | nodejs.org or `nvm install --lts` |
 | [pnpm](https://pnpm.io/installation) | latest | Frontend package manager | `corepack enable && corepack prepare pnpm@latest --activate` |
 
-You also need accounts/keys for external services once the app is wired up. Start with [docs/guides/supabase-setup.md](docs/guides/supabase-setup.md) (account + project), then create an [OpenAI API key](https://platform.openai.com/api-keys) when the LLM layer is wired up.
+You also need accounts/keys for external services. Start with [docs/guides/supabase-setup.md](docs/guides/supabase-setup.md) (account + project), then configure separate [DeepSeek](https://platform.deepseek.com/) chat and [Alibaba Cloud Model Studio](https://www.alibabacloud.com/help/en/model-studio/get-api-key) embedding keys.
 
 ## Running locally
 
@@ -65,7 +65,12 @@ Fill these values in `backend/.env`:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `DATABASE_URL` using the direct Supabase Postgres connection, not the transaction pooler
 - `OPENAI_API_KEY`
+- `OPENAI_BASE_URL` (DeepSeek chat endpoint; the variable names refer to the compatible SDK)
+- `EMBEDDING_API_KEY` (DashScope key, separate from the chat key)
+- `EMBEDDING_BASE_URL` (endpoint for the key's workspace and region)
 - `ALLOWED_ORIGINS=http://localhost:5173`
+
+The default embedding model is `text-embedding-v4`, with `EMBEDDING_DIMENSIONS=1536` and `EMBEDDING_BATCH_SIZE=10`. Ingestion and query embedding share these settings. Changing models requires rebuilding existing vectors even when their dimensions match.
 
 Frontend env:
 

@@ -303,6 +303,54 @@ def test_post_stream_returns_event_stream(client: TestClient) -> None:
     assert "text-start" in response.text
 
 
+def test_post_stream_accepts_second_turn_with_previous_answer(client: TestClient) -> None:
+    from app.assistant.deps import TurnRegistry
+    from app.assistant.outputs import GroundedAnswer
+    from app.chat.messages import build_assistant_message
+    from app.chat.streaming import stream_grounded_answer, stream_status
+    from app.database.chats import ThreadRow
+
+    thread = ThreadRow(id=THREAD_ID, user_id=TEST_USER.id, title="New chat")
+    answer = GroundedAnswer(answer="Not enough evidence.", insufficient_evidence=True)
+    registry = TurnRegistry()
+    message_id = uuid.uuid4()
+    received_questions = []
+
+    async def fake_stream(**kwargs):
+        received_questions.append(kwargs["user_message"].parts[0].text)
+        async for event in stream_status("searching", "Searching SEC filings…"):
+            yield event
+        async for event in stream_grounded_answer(
+            answer, registry, message_id=str(message_id)
+        ):
+            yield event
+
+    first_question = {"role": "user", "parts": [{"type": "text", "text": "First"}]}
+    previous_answer = build_assistant_message(
+        answer, registry, message_id=message_id
+    ).model_dump(by_alias=True, mode="json")
+    with (
+        patch("app.api.chat.ensure_user", AsyncMock()),
+        patch("app.api.chat.require_thread_access", AsyncMock(return_value=thread)),
+        patch("app.api.chat.create_user_client", AsyncMock(return_value=MagicMock())),
+        patch("app.api.chat.run_turn", fake_stream),
+    ):
+        first = client.post("/chat/stream", json={
+            "threadId": str(THREAD_ID), "messages": [first_question],
+        })
+        second = client.post("/chat/stream", json={
+            "threadId": str(THREAD_ID),
+            "messages": [first_question, previous_answer, {
+                "role": "user", "parts": [{"type": "text", "text": "Second"}],
+            }],
+        })
+
+    assert first.status_code == second.status_code == 200
+    assert '"transient":true' in first.text
+    assert '"type":"finish"' in second.text
+    assert received_questions == ["First", "Second"]
+
+
 def test_stream_request_accepts_camel_case_citation_parts() -> None:
     thread_id = uuid.uuid4()
     chunk_id = uuid.uuid4()

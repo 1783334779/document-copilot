@@ -48,6 +48,15 @@ export function classifyChatError(error: Error): ClassifiedChatError {
         showLoginLink: false,
       }
     }
+
+    if (error.status === 422) {
+      return {
+        kind: 'generic',
+        title: 'Message could not be sent',
+        message: 'The conversation could not be submitted. Refresh the page and try again.',
+        showLoginLink: false,
+      }
+    }
   }
 
   const text = error.message || ''
@@ -55,7 +64,6 @@ export function classifyChatError(error: Error): ClassifiedChatError {
   if (
     messageIncludesAny(text, [
       'grounding',
-      'citation',
       'verified against source',
       'source passages',
       'fully verify',

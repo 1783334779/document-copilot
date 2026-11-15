@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 
 from openai import OpenAI
@@ -109,7 +110,7 @@ class FtsKeywordExtraction(BaseModel):
 
 
 def _client() -> OpenAI:
-    return OpenAI(api_key=settings.openai_api_key)
+    return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
 
 
 def _token_count(query: str) -> int:
@@ -252,18 +253,24 @@ def extract_fts_keywords(
         return stripped
 
     try:
-        response = _client().chat.completions.parse(
+        response = _client().chat.completions.create(
             model=settings.retrieval_fts_keyword_model,
             temperature=0,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {
+                    "role": "system",
+                    "content": _SYSTEM_PROMPT + "\nReturn JSON matching this schema: "
+                    + json.dumps(FtsKeywordExtraction.model_json_schema()),
+                },
                 {"role": "user", "content": _build_user_message(stripped, filters)},
             ],
-            response_format=FtsKeywordExtraction,
+            response_format={"type": "json_object"},
+            extra_body={"thinking": {"type": "disabled"}},
         )
-        parsed = response.choices[0].message.parsed
-        if parsed is None:
+        content = response.choices[0].message.content
+        if not content:
             return _deterministic_fallback(stripped, filters=filters)
+        parsed = FtsKeywordExtraction.model_validate_json(content)
 
         words = _merge_fts_words(stripped, _normalize_terms(parsed.terms), filters=filters)
         if len(words) < settings.retrieval_fts_keyword_min:

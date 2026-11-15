@@ -12,7 +12,7 @@ import { useChatTransport } from '@/hooks/useChatTransport'
 import { useThreads } from '@/hooks/useThreads'
 import { classifyChatError } from '@/lib/chat-errors'
 import { getThreadMessages } from '@/lib/chat'
-import { type CitationPayload, type PipelineStatus as PipelineStatusState } from '@/lib/citations'
+import { isStatusPart, type CitationPayload, type PipelineStatus as PipelineStatusState } from '@/lib/citations'
 import { ApiError } from '@/lib/http'
 
 type ChatThreadViewProps = {
@@ -26,12 +26,16 @@ function ChatThreadView({ threadId, initialMessages }: ChatThreadViewProps) {
   const { refreshThreads } = useThreads()
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatusState | null>(null)
   const [selectedCitation, setSelectedCitation] = useState<CitationPayload | null>(null)
-  const transport = useChatTransport(threadId, setPipelineStatus)
+  const transport = useChatTransport(threadId)
 
   const { messages, sendMessage, status, error, stop } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
+    onData: (part) => {
+      if (isStatusPart(part)) setPipelineStatus(part.data)
+    },
+    onError: () => setPipelineStatus(null),
     onFinish: () => {
       setPipelineStatus(null)
       void refreshThreads()

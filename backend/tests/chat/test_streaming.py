@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -49,13 +50,15 @@ def _grounded_answer() -> tuple[GroundedAnswer, TurnRegistry]:
 
 
 @pytest.mark.anyio
-async def test_stream_status_emits_data_status_event() -> None:
+async def test_stream_status_is_transient_so_follow_up_history_stays_valid() -> None:
     events = [event async for event in stream_status("searching", "Searching SEC filings…")]
 
     assert len(events) == 1
     assert '"type":"data-status"' in events[0]
     assert '"stage":"searching"' in events[0]
     assert "Searching SEC filings" in events[0]
+    payload = json.loads(events[0].removeprefix("data: ").strip())
+    assert payload["transient"] is True
 
 
 @pytest.mark.anyio

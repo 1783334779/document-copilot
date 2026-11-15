@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic_ai import Agent, UsageLimits
+from pydantic_ai import Agent, PromptedOutput, UsageLimits
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.profiles.openai import OpenAIModelProfile
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.assistant.deps import DocumentAgentDeps
@@ -30,12 +31,21 @@ def get_document_agent() -> Agent[DocumentAgentDeps, GroundedAnswer]:
     if _document_agent is None:
         model = OpenAIChatModel(
             settings.openai_chat_model,
-            provider=OpenAIProvider(api_key=settings.openai_api_key),
+            provider=OpenAIProvider(
+                api_key=settings.openai_api_key, base_url=settings.openai_base_url
+            ),
+            # Use JSON mode for final answers while keeping retrieval tools available.
+            profile=OpenAIModelProfile(
+                supports_json_schema_output=False,
+                supports_json_object_output=True,
+                openai_supports_tool_choice_required=False,
+            ),
+            settings={"extra_body": {"thinking": {"type": "disabled"}}},
         )
         _document_agent = Agent(
             model,
             deps_type=DocumentAgentDeps,
-            output_type=GroundedAnswer,
+            output_type=PromptedOutput(GroundedAnswer),
             instructions=INSTRUCTIONS,
             tools=[search_filings, read_chunks, read_chunk, read_surrounding_chunks],
         )

@@ -27,7 +27,10 @@ def _sse_event(payload: dict[str, object]) -> str:
 
 async def stream_status(stage: str, message: str) -> AsyncIterator[str]:
     part = StatusPart(data=StatusPayload(stage=stage, message=message))
-    yield _sse_event(part.model_dump(by_alias=True, mode="json"))
+    yield _sse_event({
+        **part.model_dump(by_alias=True, mode="json"),
+        "transient": True,
+    })
 
 
 async def _text_events(

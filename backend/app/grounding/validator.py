@@ -65,7 +65,9 @@ class GroundingJudge(Protocol):
 
 class OpenAIGroundingJudge:
     def __init__(self) -> None:
-        self._client = OpenAI(api_key=settings.openai_api_key)
+        self._client = OpenAI(
+            api_key=settings.openai_api_key, base_url=settings.openai_base_url
+        )
 
     async def judge(
         self,
@@ -77,11 +79,16 @@ class OpenAIGroundingJudge:
         self,
         cases: list[CitationGroundingCase],
     ) -> list[CitationGroundingDecision]:
-        response = self._client.chat.completions.parse(
+        response = self._client.chat.completions.create(
             model=settings.openai_grounding_model,
             temperature=0,
             messages=[
-                {"role": "system", "content": _GROUNDING_JUDGE_SYSTEM_PROMPT},
+                {
+                    "role": "system",
+                    "content": _GROUNDING_JUDGE_SYSTEM_PROMPT
+                    + "\nReturn JSON matching this schema: "
+                    + json.dumps(CitationGroundingDecisionList.model_json_schema()),
+                },
                 {
                     "role": "user",
                     "content": json.dumps(
@@ -90,11 +97,13 @@ class OpenAIGroundingJudge:
                     ),
                 },
             ],
-            response_format=CitationGroundingDecisionList,
+            response_format={"type": "json_object"},
+            extra_body={"thinking": {"type": "disabled"}},
         )
-        parsed = response.choices[0].message.parsed
-        if parsed is None:
+        content = response.choices[0].message.content
+        if not content:
             raise ValueError("Grounding judge returned no parsed decision.")
+        parsed = CitationGroundingDecisionList.model_validate_json(content)
         return parsed.decisions
 
 

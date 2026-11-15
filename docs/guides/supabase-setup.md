@@ -62,6 +62,10 @@ Alembic migrations create and update:
 
 Use the direct/session database connection string for Alembic. Do not use the transaction pooler connection string for migrations.
 
+In the dashboard, click **Connect** and select **Direct connection**, or **Session pooler** if your network requires IPv4. Copy the full URI into `backend/.env` as `DATABASE_URL`. Session pooler uses port `5432` and username `postgres.<project-ref>`.
+
+Replace the entire `[YOUR-PASSWORD]` placeholder, including its brackets, with your database password. URL-encode special characters in the password. This is the password chosen when creating the project, not an API key or your Supabase account password. If you see `password authentication failed`, check for leftover brackets and confirm the database password.
+
 From `backend/`:
 
 ```bash

@@ -18,7 +18,7 @@ LONG_NEUTRAL_QUERY = (
 
 def _mock_parse_response(terms: list[str]) -> MagicMock:
     message = MagicMock()
-    message.parsed = FtsKeywordExtraction(terms=terms)
+    message.content = FtsKeywordExtraction(terms=terms).model_dump_json()
     choice = MagicMock()
     choice.message = message
     response = MagicMock()
@@ -28,7 +28,7 @@ def _mock_parse_response(terms: list[str]) -> MagicMock:
 
 @patch("app.retrieval.keywords._client")
 def test_extract_fts_keywords_returns_llm_terms(mock_client: MagicMock) -> None:
-    mock_client.return_value.chat.completions.parse.return_value = _mock_parse_response(
+    mock_client.return_value.chat.completions.create.return_value = _mock_parse_response(
         ["data center", "demand", "customer concentration"]
     )
 
@@ -39,7 +39,7 @@ def test_extract_fts_keywords_returns_llm_terms(mock_client: MagicMock) -> None:
     assert "demand" in result.casefold()
     assert "center" in result.casefold()
     assert "nvidia" not in result.casefold()
-    call_kwargs = mock_client.return_value.chat.completions.parse.call_args.kwargs
+    call_kwargs = mock_client.return_value.chat.completions.create.call_args.kwargs
     user_message = call_kwargs["messages"][1]["content"]
     assert "Ticker filter: NVDA" in user_message
     assert LONG_NVDA_QUERY in user_message
@@ -52,12 +52,12 @@ def test_extract_fts_keywords_fast_path_skips_llm(mock_client: MagicMock) -> Non
     result = extract_fts_keywords(short_query)
 
     assert result == short_query
-    mock_client.return_value.chat.completions.parse.assert_not_called()
+    mock_client.return_value.chat.completions.create.assert_not_called()
 
 
 @patch("app.retrieval.keywords._client")
 def test_extract_fts_keywords_clamps_to_max_terms(mock_client: MagicMock) -> None:
-    mock_client.return_value.chat.completions.parse.return_value = _mock_parse_response(
+    mock_client.return_value.chat.completions.create.return_value = _mock_parse_response(
         ["one", "two", "three", "four", "five", "six"]
     )
 
@@ -68,7 +68,7 @@ def test_extract_fts_keywords_clamps_to_max_terms(mock_client: MagicMock) -> Non
 
 @patch("app.retrieval.keywords._client")
 def test_extract_fts_keywords_dedupes_terms(mock_client: MagicMock) -> None:
-    mock_client.return_value.chat.completions.parse.return_value = _mock_parse_response(
+    mock_client.return_value.chat.completions.create.return_value = _mock_parse_response(
         ["Azure", "azure", "AI", "cloud"]
     )
 
@@ -79,7 +79,7 @@ def test_extract_fts_keywords_dedupes_terms(mock_client: MagicMock) -> None:
 
 @patch("app.retrieval.keywords._client")
 def test_extract_fts_keywords_falls_back_when_llm_raises(mock_client: MagicMock) -> None:
-    mock_client.return_value.chat.completions.parse.side_effect = RuntimeError("api down")
+    mock_client.return_value.chat.completions.create.side_effect = RuntimeError("api down")
 
     result = extract_fts_keywords(LONG_NVDA_QUERY)
 
@@ -91,7 +91,7 @@ def test_extract_fts_keywords_falls_back_when_llm_raises(mock_client: MagicMock)
 
 @patch("app.retrieval.keywords._client")
 def test_extract_fts_keywords_falls_back_when_too_few_terms(mock_client: MagicMock) -> None:
-    mock_client.return_value.chat.completions.parse.return_value = _mock_parse_response(
+    mock_client.return_value.chat.completions.create.return_value = _mock_parse_response(
         ["Azure"]
     )
 
@@ -103,12 +103,12 @@ def test_extract_fts_keywords_falls_back_when_too_few_terms(mock_client: MagicMo
 @patch("app.retrieval.keywords._client")
 def test_extract_fts_keywords_falls_back_when_parse_is_none(mock_client: MagicMock) -> None:
     message = MagicMock()
-    message.parsed = None
+    message.content = None
     choice = MagicMock()
     choice.message = message
     response = MagicMock()
     response.choices = [choice]
-    mock_client.return_value.chat.completions.parse.return_value = response
+    mock_client.return_value.chat.completions.create.return_value = response
 
     result = extract_fts_keywords(LONG_NVDA_QUERY)
 

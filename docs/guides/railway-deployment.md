@@ -35,7 +35,13 @@ SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your-anon-public-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-secret-key
 DATABASE_URL=postgresql://postgres:your-password@db.your-project-ref.supabase.co:5432/postgres
-OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_API_KEY=your-deepseek-api-key
+OPENAI_BASE_URL=https://api.deepseek.com
+EMBEDDING_API_KEY=your-dashscope-api-key
+EMBEDDING_BASE_URL=https://your-workspace-id.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+EMBEDDING_MODEL=text-embedding-v4
+EMBEDDING_DIMENSIONS=1536
+EMBEDDING_BATCH_SIZE=10
 ALLOWED_ORIGINS=http://localhost:5173
 ```
 
@@ -108,6 +114,11 @@ railway variable set \
   SUPABASE_URL=https://your-project-ref.supabase.co \
   SUPABASE_ANON_KEY=your-anon-public-key \
   DATABASE_URL=postgresql://postgres:your-password@db.your-project-ref.supabase.co:5432/postgres \
+  OPENAI_BASE_URL=https://api.deepseek.com \
+  EMBEDDING_BASE_URL=https://your-workspace-id.cn-beijing.maas.aliyuncs.com/compatible-mode/v1 \
+  EMBEDDING_MODEL=text-embedding-v4 \
+  EMBEDDING_DIMENSIONS=1536 \
+  EMBEDDING_BATCH_SIZE=10 \
   ALLOWED_ORIGINS=http://localhost:5173 \
   --service document-copilot-backend \
   --skip-deploys
@@ -118,6 +129,11 @@ printf "%s" "$SUPABASE_SERVICE_ROLE_KEY" | railway variable set SUPABASE_SERVICE
   --skip-deploys
 
 printf "%s" "$OPENAI_API_KEY" | railway variable set OPENAI_API_KEY \
+  --stdin \
+  --service document-copilot-backend \
+  --skip-deploys
+
+printf "%s" "$EMBEDDING_API_KEY" | railway variable set EMBEDDING_API_KEY \
   --stdin \
   --service document-copilot-backend \
   --skip-deploys

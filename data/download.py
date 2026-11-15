@@ -7,8 +7,9 @@ import json
 import shutil
 import time
 from datetime import UTC, datetime
+from http.client import IncompleteRead
 from pathlib import Path
-from urllib import request
+from urllib import error, request
 
 
 # Params: edit these, then run `uv run data/download.py`
@@ -16,7 +17,9 @@ USER_AGENT = "Document Copilot your.email@example.com"
 TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"]
 FILINGS_PER_COMPANY = 5
 OUTPUT_DIR = Path(__file__).resolve().parent / "downloads"
-CLEAR_OUTPUT_DIR = True
+CLEAR_OUTPUT_DIR = False
+REQUEST_TIMEOUT = 60
+REQUEST_ATTEMPTS = 4
 
 COMPANY_CIKS = {
     "AAPL": "0000320193",
@@ -28,23 +31,56 @@ COMPANY_CIKS = {
 
 
 def get_json(url: str) -> dict:
-    req = request.Request(
-        url, headers={"Accept": "application/json", "User-Agent": USER_AGENT}
-    )
-    with request.urlopen(req, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+    return json.loads(get_bytes(url, accept="application/json"))
 
 
-def get_bytes(url: str) -> bytes:
+def get_bytes(
+    url: str, accept: str = "text/html,application/xhtml+xml,application/xml"
+) -> bytes:
     req = request.Request(
         url,
         headers={
-            "Accept": "text/html,application/xhtml+xml,application/xml",
+            "Accept": accept,
             "User-Agent": USER_AGENT,
         },
     )
-    with request.urlopen(req, timeout=60) as response:
-        return response.read()
+    for attempt in range(1, REQUEST_ATTEMPTS + 1):
+        time.sleep(0.2)
+        try:
+            with request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
+                return response.read()
+        except (error.URLError, TimeoutError, ConnectionError, IncompleteRead) as exc:
+            if isinstance(exc, error.HTTPError) and exc.code not in (
+                408, 429, 500, 502, 503, 504
+            ):
+                raise
+            if attempt == REQUEST_ATTEMPTS:
+                raise RuntimeError(
+                    f"Download failed after {attempt} attempts: {url}. "
+                    "Completed files are preserved; rerun to resume."
+                ) from exc
+            delay = 2 ** attempt
+            if isinstance(exc, error.HTTPError):
+                retry_after = exc.headers.get("Retry-After", "")
+                if retry_after.isdigit():
+                    delay = max(delay, int(retry_after))
+            print(
+                f"Request failed ({exc}); retry {attempt}/{REQUEST_ATTEMPTS - 1} "
+                f"in {delay}s: {url}",
+                flush=True,
+            )
+            time.sleep(delay)
+
+    raise AssertionError("REQUEST_ATTEMPTS must be positive")
+
+
+def save_manifest(manifest: dict) -> None:
+    manifest_path = OUTPUT_DIR / "manifest.json"
+    temporary_path = manifest_path.with_suffix(".json.part")
+    temporary_path.write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    temporary_path.replace(manifest_path)
 
 
 def download_filings() -> dict:
@@ -67,20 +103,17 @@ def download_filings() -> dict:
     }
 
     for ticker in TICKERS:
-        print(f"Downloading {ticker} filings...")
+        print(f"Downloading {ticker} filings...", flush=True)
         cik = COMPANY_CIKS[ticker]
         submission = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")
-        submissions = [submission]
-        submissions.extend(
-            get_json(f"https://data.sec.gov/submissions/{item['name']}")
-            for item in submission.get("filings", {}).get("files", [])
-        )
-
-        filings = []
-        for sec_submission in submissions:
-            filings.extend(extract_10k_filings(sec_submission, target_years))
+        filings = extract_10k_filings(submission, target_years)
+        for item in submission.get("filings", {}).get("files", []):
             if len(filings) >= FILINGS_PER_COMPANY:
                 break
+            sec_submission = get_json(
+                f"https://data.sec.gov/submissions/{item['name']}"
+            )
+            filings.extend(extract_10k_filings(sec_submission, target_years))
 
         for filing in filings[:FILINGS_PER_COMPANY]:
             accession_path = filing["accession_number"].replace("-", "")
@@ -95,7 +128,14 @@ def download_filings() -> dict:
                 f"{filing['filing_date']}_{filing['accession_number']}"
                 f"{Path(filing['primary_document']).suffix or '.html'}"
             )
-            local_path.write_bytes(get_bytes(source_url))
+            if local_path.is_file() and local_path.stat().st_size:
+                print(f"  Already downloaded: {local_path.name}", flush=True)
+            else:
+                print(f"  Downloading: {local_path.name}", flush=True)
+                content = get_bytes(source_url)
+                temporary_path = local_path.with_suffix(local_path.suffix + ".part")
+                temporary_path.write_bytes(content)
+                temporary_path.replace(local_path)
 
             manifest["filings"].append(
                 {
@@ -112,10 +152,9 @@ def download_filings() -> dict:
             )
             manifest["downloaded_count"] += 1
 
-            time.sleep(0.2)
+            save_manifest(manifest)
 
-    manifest_path = OUTPUT_DIR / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    save_manifest(manifest)
     return manifest
 
 

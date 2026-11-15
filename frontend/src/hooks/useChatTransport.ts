@@ -2,52 +2,10 @@ import { useMemo } from 'react'
 import { DefaultChatTransport } from 'ai'
 
 import { getAccessToken } from '@/lib/api'
-import { isStatusPart, type PipelineStatus } from '@/lib/citations'
 import { env } from '@/lib/env'
+import { ApiError } from '@/lib/http'
 
-async function consumeStatusStream(
-  stream: ReadableStream<Uint8Array>,
-  onStatus: (status: PipelineStatus) => void,
-) {
-  const reader = stream.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) {
-          continue
-        }
-
-        try {
-          const parsed: unknown = JSON.parse(line.slice(6))
-          if (isStatusPart(parsed)) {
-            onStatus(parsed.data)
-          }
-        } catch {
-          // Ignore malformed SSE payloads.
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock()
-  }
-}
-
-export function useChatTransport(
-  threadId: string,
-  onStatus?: (status: PipelineStatus) => void,
-) {
+export function useChatTransport(threadId: string) {
   return useMemo(
     () =>
       new DefaultChatTransport({
@@ -57,25 +15,34 @@ export function useChatTransport(
           return token ? { Authorization: `Bearer ${token}` } : {}
         },
         prepareSendMessagesRequest: ({ messages }) => ({
-          body: { threadId, messages },
+          body: {
+            threadId,
+            messages: messages
+              .map((message) => ({
+                ...message,
+                parts: message.parts.filter(
+                  (part) => part.type === 'text' || part.type === 'data-citation',
+                ),
+              }))
+              .filter((message) => message.parts.length > 0),
+          },
         }),
         fetch: async (input, init) => {
           const response = await fetch(input, init)
 
-          if (!response.ok || !response.body || !onStatus) {
-            return response
+          if (!response.ok) {
+            const detail: unknown = await response.json().catch(() => null)
+            const message =
+              detail !== null && typeof detail === 'object' &&
+              'detail' in detail && typeof detail.detail === 'string'
+                ? detail.detail
+                : `Request failed (${response.status})`
+            throw new ApiError(message, { status: response.status, detail })
           }
 
-          const [clientStream, statusStream] = response.body.tee()
-          void consumeStatusStream(statusStream, onStatus)
-
-          return new Response(clientStream, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-          })
+          return response
         },
       }),
-    [threadId, onStatus],
+    [threadId],
   )
 }

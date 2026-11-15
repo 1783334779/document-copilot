@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import computed_field
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -19,19 +19,24 @@ class Settings(BaseSettings):
     database_url: str
 
     openai_api_key: str
-    openai_embedding_model: str = "text-embedding-3-small"
-    openai_embedding_dimensions: int = 1536
-    openai_chat_model: str = "gpt-5.5"
-    openai_grounding_model: str = "gpt-4.1-mini"
+    openai_base_url: str
+    openai_chat_model: str = "deepseek-flash"
+    openai_grounding_model: str = "deepseek-flash"
     openai_agent_request_limit: int = 20
     openai_agent_temperature: float = 0.0
+
+    embedding_api_key: str
+    embedding_base_url: str
+    embedding_model: str = "text-embedding-v4"
+    embedding_dimensions: int = 1536
+    embedding_batch_size: int = Field(default=10, gt=0)
 
     retrieval_candidate_k: int = 50
     retrieval_top_k: int = 10
     retrieval_rrf_k: int = 60
     retrieval_neighbor_radius: int = 1
     retrieval_fts_config: str = "english"
-    retrieval_fts_keyword_model: str = "gpt-4.1-mini"
+    retrieval_fts_keyword_model: str = "deepseek-flash"
     retrieval_fts_keyword_min: int = 3
     retrieval_fts_keyword_max: int = 5
     retrieval_fts_keyword_fast_path_tokens: int = 5

@@ -24,7 +24,7 @@ flowchart LR
         db[(Postgres<br/>chats, documents, chunks<br/>pgvector + full-text)]
     end
 
-    openai[OpenAI<br/>LLM + embeddings]
+    openai[DeepSeek chat + DashScope embeddings<br/>OpenAI-compatible APIs]
     corpus[SEC filing corpus]
     ingestion[Ingestion pipeline<br/>download, parse, chunk, embed]
 
@@ -67,7 +67,7 @@ Backend:
 - FastAPI + Uvicorn
 - Pydantic v2 + pydantic-settings
 - PydanticAI for typed LLM orchestration
-- OpenAI SDK for generation and embeddings
+- OpenAI SDK for DeepSeek generation and DashScope embeddings, with separate credentials and endpoints
 - Supabase Python client for server-side database access
 - SQLAlchemy models + Alembic migrations for schema management
 - Supabase `pgvector` for semantic search
@@ -200,7 +200,7 @@ Retrieval and grounding remain independent from PydanticAI. This keeps ingestion
 
 Document Copilot uses hybrid retrieval:
 
-1. Embed the user's query with the configured OpenAI embedding model.
+1. Embed the user's query with the same configured DashScope model and dimensions used during ingestion.
 2. Run a semantic search over `document_chunks.embedding` with `pgvector`.
 3. Run a lexical search over `document_chunks.search_vector` with Postgres full-text search.
 4. Fuse the two ranked lists in Python with Reciprocal Rank Fusion.
@@ -362,8 +362,10 @@ Backend settings:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `DATABASE_URL` for Alembic and direct Postgres access
 - `OPENAI_API_KEY`
+- `OPENAI_BASE_URL` for DeepSeek chat, keyword extraction, and grounding
+- `EMBEDDING_API_KEY` and `EMBEDDING_BASE_URL` for DashScope embeddings
+- `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`, and `EMBEDDING_BATCH_SIZE` shared by ingestion and retrieval
 - `ALLOWED_ORIGINS`
-- embedding model name and dimensions
 
 Do not read environment variables directly from components, route handlers, or services. Frontend code should use `src/lib/env.ts`. Backend code should use `app/config.py`.
 

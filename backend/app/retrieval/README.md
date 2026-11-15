@@ -9,7 +9,7 @@ flowchart TD
     Q[User query + optional SearchFilters] --> PAR[Parallel prep]
     PAR --> E[embed_query full query]
     PAR --> KW[extract_fts_keywords LLM]
-    E -->|OpenAI embedding| VEC[Query vector]
+    E -->|DashScope embedding| VEC[Query vector]
     KW --> FTSQ[3-5 keyword terms]
 
     VEC --> DUAL[semantic_search + full_text_search in parallel]
@@ -59,8 +59,9 @@ All retrieval tuning lives in `app/config.py` and can be overridden via environm
 | `retrieval_fts_keyword_min` | `3` | Minimum extracted FTS terms |
 | `retrieval_fts_keyword_max` | `5` | Maximum extracted FTS terms |
 | `retrieval_fts_keyword_fast_path_tokens` | `5` | Skip keyword LLM when query is this short |
-| `openai_embedding_model` | `"text-embedding-3-small"` | Model used for live query embeddings |
-| `openai_embedding_dimensions` | `1536` | Embedding width; must match ingested chunk vectors |
+| `embedding_model` | `"text-embedding-v4"` | Model used for both ingestion and live query embeddings |
+| `embedding_dimensions` | `1536` | Embedding width; must match ingested chunk vectors |
+| `embedding_batch_size` | `10` | Maximum texts per ingestion API request |
 
 ### `DocumentRetriever.search` parameters
 
@@ -96,7 +97,7 @@ Unset fields apply no filter. Filters are ANDed together.
 | File | Responsibility |
 | --- | --- |
 | `retriever.py` | `DocumentRetriever` orchestrator: embed → search → fuse → hydrate |
-| `embeddings.py` | OpenAI query embedding |
+| `embeddings.py` | DashScope query embedding via the OpenAI-compatible SDK |
 | `keywords.py` | LLM keyword extraction for full-text search |
 | `queries.py` | pgvector semantic search + Postgres FTS SQL |
 | `fusion.py` | Reciprocal Rank Fusion |
